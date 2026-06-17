@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "api/store.js": { "runtime": "nodejs20.x" }
+  },
+  "routes": [
+    { "src": "/api/store", "dest": "/api/store.js" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}
