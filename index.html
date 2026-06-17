@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalView — Dev Servers</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23a855f7'/><stop offset='1' stop-color='%236366f1'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M18.5 5L9 17.5h7.5L15 27l8.5-12.5H16L18.5 5z' fill='%23ffcf6b'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="desktop.css" />
+</head>
+<body>
+  <div class="wallpaper">
+    <div class="wp-blob a"></div>
+    <div class="wp-blob b"></div>
+    <div class="wp-blob c"></div>
+  </div>
+  <div class="wp-grain"></div>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+  <script src="design_handoff_localos_desktop/data.js"></script>
+  <script src="websites.js"></script>
+  <script>window.PROJECTS=[]; window.INCOMING=[];</script>
+
+  <script type="text/babel" src="desktop_components.jsx"></script>
+  <script type="text/babel" src="website_components.jsx"></script>
+  <script type="text/babel" src="add_modal.jsx"></script>
+  <script type="text/babel" src="desktop_app_live.jsx"></script>
+</body>
+</html>
