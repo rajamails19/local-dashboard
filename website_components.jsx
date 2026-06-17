@@ -22,12 +22,23 @@ function SiteIcon({ id, size = 46 }) {
   return <div className="app-icon" style={{ background: iconBg(fw.color), width: size, height: size, borderRadius, flexShrink: 0 }}>{dGlyph(fw.glyph)}</div>;
 }
 
-function WebTile({ w, onOpen }) {
+function WebTile({ w, onOpen, draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver }) {
   const fw   = wFw(w.framework);
   const live = w.deployed && !!w.url;
   const label = w.displayName || w.name;
   return (
-    <div className={`tile ${live ? "" : "off"}`} style={{ cursor: "pointer" }} onClick={() => onOpen(w)}>
+    <div className={`tile ${live ? "" : "off"}`}
+      style={{ cursor: draggable ? "grab" : "pointer", transition:"transform .15s, box-shadow .15s, opacity .15s",
+        opacity: isDragOver === "dragging" ? 0.45 : 1,
+        outline: isDragOver === "over" ? "2px solid var(--amber)" : "none",
+        outlineOffset: 2,
+      }}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      onClick={() => onOpen(w)}>
       <div className="tile-top">
         <SiteIcon id={w.id} size={46} />
         <div className="tile-id">

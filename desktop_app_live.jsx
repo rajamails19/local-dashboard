@@ -168,6 +168,8 @@ function OSApp() {
   });
   const [addingTab,    setAddingTab]    = oS(false);   // show inline name input
 
+  const dragIdx        = oR(null);
+  const [dragOver,     setDragOver]     = oS(null);   // index being hovered
   const knownIds       = oR(new Set());
   const namesRef       = oR({});
   namesRef.current     = names;
@@ -275,6 +277,24 @@ function OSApp() {
     setCollections(cs=>{ const next=cs.map(c=>c.id===colId?{...c,items:c.items.map(x=>x.id===w.id?{...x,...patch}:x)}:c); saveCollections(next); return next; });
     setActiveWeb(a=>a&&a.id===w.id?{...a,...patch}:a);
   },[]);
+
+  const reorderGrid = oCB((fromIdx, toIdx) => {
+    if (fromIdx === toIdx || fromIdx == null) return;
+    const reorder = arr => {
+      const next = [...arr];
+      const [item] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, item);
+      return next;
+    };
+    const colId = tab.startsWith("col_") ? tab : null;
+    if (colId) {
+      setCollections(cs => { const next = cs.map(c => c.id===colId ? {...c, items: reorder(c.items)} : c); saveCollections(next); return next; });
+    } else {
+      setWebsites(ws => { const next = reorder(ws); saveWebsites(next); return next; });
+    }
+    setDragOver(null);
+    dragIdx.current = null;
+  }, [tab]);
 
   const deleteCollectionItem = oCB((colId, w) => {
     setCollections(cs=>{ const next=cs.map(c=>c.id===colId?{...c,items:c.items.filter(x=>x.id!==w.id)}:c); saveCollections(next); return next; });
@@ -463,7 +483,16 @@ function OSApp() {
                 ? <div className="empty" style={{color:"rgba(255,255,255,.4)",textAlign:"center",paddingTop:48}}>
                     {query ? `No results for "${query}".` : isCollection ? "No websites yet — click + Add to get started." : `No websites match "${query}".`}
                   </div>
-                : gridItems.map(w=><WebTile key={w.id} w={w} onOpen={openW}/>)
+                : gridItems.map((w,i)=>(
+                    <WebTile key={w.id} w={w} onOpen={openW}
+                      draggable={!query}
+                      isDragOver={dragIdx.current===i ? "dragging" : dragOver===i ? "over" : null}
+                      onDragStart={()=>{ dragIdx.current=i; }}
+                      onDragOver={e=>{ e.preventDefault(); setDragOver(i); }}
+                      onDrop={()=>reorderGrid(dragIdx.current, i)}
+                      onDragEnd={()=>{ setDragOver(null); dragIdx.current=null; }}
+                    />
+                  ))
             )}
           </div>
         </div>
