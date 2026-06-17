@@ -413,7 +413,7 @@ const server = http.createServer((req, res) => {
     '/desktop_app_live.jsx':    { file: __dirname + '/desktop_app_live.jsx',    mime: 'application/javascript' },
     '/websites.js':             { file: __dirname + '/websites.js',             mime: 'application/javascript' },
     '/design_handoff_localview_fc/data.js':   { file: __dirname + '/design_handoff_localview_fc/data.js',   mime: 'application/javascript' },
-    '/design_handoff_localos_desktop/data.js':{ file: __dirname + '/../design_handoff_localos_desktop/data.js', mime: 'application/javascript' },
+    '/design_handoff_localos_desktop/data.js':{ file: __dirname + '/design_handoff_localos_desktop/data.js', mime: 'application/javascript' },
     '/index-classic.html': { file: __dirname + '/index-classic.html', mime: 'text/html' },
     '/add_modal.jsx':       { file: __dirname + '/add_modal.jsx',       mime: 'application/javascript' },
   };

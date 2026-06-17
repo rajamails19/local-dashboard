@@ -3,7 +3,7 @@
    ============================================================ */
 
 /* framework color map re-used from FW, fallback purple */
-function wFw(fw) { return window.FW[fw] || { glyph: "vite", color: "#a06bff" }; }
+function wFw(fw) { return (window.FW && window.FW[fw]) || { glyph: "vite", color: "#a06bff" }; }
 
 function SiteIcon({ id, size = 46 }) {
   const info = (window.SITE_ICONS || {})[id];
