@@ -6,6 +6,25 @@ const { useState: oS, useEffect: oE, useMemo: oM, useRef: oR, useCallback: oCB }
 /* ── cross-file component refs ── */
 const AddModal = window.AddModal;
 
+/* ── Remote store (Gist via /api/store) — falls back to localStorage only ── */
+const REMOTE = typeof window !== "undefined" && window.location.hostname !== "localhost";
+async function remoteLoad() {
+  try {
+    const r = await fetch("/api/store");
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+async function remoteSave(payload) {
+  try {
+    await fetch("/api/store", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {}
+}
+
 /* ── server data transform ── */
 const _BE  = new Set(["Express","Fastify","NestJS","Hono","Koa","FastAPI","Flask","Django","Rails"]);
 const _DB  = new Set(["Supabase","SQLite","PostgreSQL","MySQL","MongoDB","Redis","Prisma"]);
@@ -149,14 +168,42 @@ function OSApp() {
   });
   const [addingTab,    setAddingTab]    = oS(false);   // show inline name input
 
-  const knownIds  = oR(new Set());
-  const namesRef  = oR({});
-  namesRef.current = names;
-  const searchRef = oR(null);
+  const knownIds       = oR(new Set());
+  const namesRef       = oR({});
+  namesRef.current     = names;
+  const searchRef      = oR(null);
+  const collectionsRef = oR(collections);
+  collectionsRef.current = collections;
+  const websitesRef    = oR(websites);
+  websitesRef.current  = websites;
+
+  /* load from remote on first mount (Vercel only) */
+  oE(()=>{
+    if (!REMOTE) return;
+    remoteLoad().then(data => {
+      if (!data) return;
+      if (Array.isArray(data.collections) && data.collections.length > 0) {
+        setCollections(data.collections);
+        try { localStorage.setItem("lv_collections", JSON.stringify(data.collections)); } catch{}
+      }
+      if (Array.isArray(data.websites) && data.websites.length > 0) {
+        setWebsites(data.websites);
+        try { localStorage.setItem("lv_websites", JSON.stringify(data.websites)); } catch{}
+      }
+    });
+  }, []);
 
   /* sync-save helpers — called immediately inside every mutation */
-  const saveCollections = cs => { try { localStorage.setItem("lv_collections", JSON.stringify(cs)); } catch{} return cs; };
-  const saveWebsites    = ws => { try { localStorage.setItem("lv_websites",    JSON.stringify(ws)); } catch{} return ws; };
+  const saveCollections = cs => {
+    try { localStorage.setItem("lv_collections", JSON.stringify(cs)); } catch{}
+    if (REMOTE) remoteSave({ collections: cs, websites: websitesRef.current });
+    return cs;
+  };
+  const saveWebsites = ws => {
+    try { localStorage.setItem("lv_websites", JSON.stringify(ws)); } catch{}
+    if (REMOTE) remoteSave({ collections: collectionsRef.current, websites: ws });
+    return ws;
+  };
 
   /* active collection object */
   const activeCollection = oM(() => collections.find(c=>c.id===tab) || null, [collections, tab]);
