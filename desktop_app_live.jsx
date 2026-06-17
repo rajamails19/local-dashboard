@@ -276,6 +276,11 @@ function OSApp() {
     setActiveWeb(a=>a&&a.id===w.id?{...a,...patch}:a);
   },[]);
 
+  const deleteCollectionItem = oCB((colId, w) => {
+    setCollections(cs=>{ const next=cs.map(c=>c.id===colId?{...c,items:c.items.filter(x=>x.id!==w.id)}:c); saveCollections(next); return next; });
+    setActiveWeb(null);
+  },[]);
+
   const addServer = oCB(obj => { setProjects(ps => [...ps, obj]); },[]);
 
   const addWebsite = oCB(obj => {
@@ -473,10 +478,13 @@ function OSApp() {
 
       {/* ── detail windows ── */}
       <MacWindow p={winP} onClose={closeP} onToggle={(p,on)=>{ if(!on){ kill(p); closeP(); } }}/>
-      <WebWindow w={winW} onClose={closeW} onUpdate={(w,patch)=>{
-        if(isCollection) updateCollectionWebsite(activeCollection.id, w, patch);
-        else updateWebsite(w, patch);
-      }}/>
+      <WebWindow w={winW} onClose={closeW}
+        onUpdate={(w,patch)=>{
+          if(isCollection) updateCollectionWebsite(activeCollection.id, w, patch);
+          else updateWebsite(w, patch);
+        }}
+        onDelete={isCollection ? (w=>deleteCollectionItem(activeCollection.id, w)) : null}
+      />
       <AddModal open={showAdd} defaultType={addType} onClose={()=>setShowAdd(false)} onAddServer={addServer} onAddWebsite={addWebsite}/>
       <Notification notif={notif} onGo={()=>{ const np=projects.find(x=>x.id===notif.id); if(np)openP(np); setNotif(null); }}/>
     </div>
