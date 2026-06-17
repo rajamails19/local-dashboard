@@ -1,7 +1,12 @@
 {
-  "functions": {
-    "api/store.js": { "runtime": "nodejs20.x" }
-  },
+  "builds": [
+    { "src": "api/store.js", "use": "@vercel/node" },
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "*.js", "use": "@vercel/static" },
+    { "src": "*.css", "use": "@vercel/static" },
+    { "src": "*.jsx", "use": "@vercel/static" },
+    { "src": "design_handoff_localos_desktop/**", "use": "@vercel/static" }
+  ],
   "routes": [
     { "src": "/api/store", "dest": "/api/store.js" },
     { "src": "/(.*)", "dest": "/$1" }
