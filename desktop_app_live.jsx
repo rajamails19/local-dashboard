@@ -280,8 +280,10 @@ function OSApp() {
   const [menuDragIdx,  setMenuDragIdx]  = oS(null);
   const [menuDragOver, setMenuDragOver] = oS(null);
   const [syncStatus,   setSyncStatus]   = oS("idle"); // "idle" | "saving" | "ok" | "error"
-  const [leftOpen,     setLeftOpen]     = oS(true);
-  const [rightOpen,    setRightOpen]    = oS(true);
+  const [leftWidth,    setLeftWidth]     = oS(148);
+  const [rightWidth,   setRightWidth]   = oS(148);
+  const MIN_SIDEBAR = 28;
+  const MAX_SIDEBAR = 320;
 
   const dragIdx        = oR(null);
   const [dragOver,     setDragOver]     = oS(null);   // index being hovered
@@ -727,14 +729,26 @@ function OSApp() {
             else deleteWebsite(item._w);
           };
 
+          const startDrag = (e, setter, direction) => {
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = direction === "left" ? leftWidth : rightWidth;
+            const onMove = mv => {
+              const delta = direction === "left" ? (mv.clientX - startX) : (startX - mv.clientX);
+              setter(Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, startW + delta)));
+            };
+            const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onUp);
+          };
+
           const sidebarBase = {
             flexShrink:0, alignSelf:"stretch", background:"rgba(0,0,0,.18)",
-            borderRadius:14, overflow:"hidden", display:"flex", flexDirection:"column",
-            transition:"width .2s ease",
+            borderRadius:14, overflow:"hidden", display:"flex", flexDirection:"column", position:"relative",
           };
           const sidebarHead = {
             fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
-            color:"rgba(255,255,255,.3)", padding:"8px 8px 4px",
+            color:"rgba(255,255,255,.3)", padding:"6px 8px 4px",
             borderBottom:"1px solid rgba(255,255,255,.07)",
             display:"flex", alignItems:"center", gap:4,
           };
@@ -744,33 +758,30 @@ function OSApp() {
                 lineHeight:1, background:"rgba(255,255,255,.08)", borderRadius:4, padding:"1px 5px",
                 userSelect:"none", flexShrink:0 }}>+</span>
           );
-          const expandBtn = (open, onClick) => (
-            <div onClick={onClick} title={open?"Minimize":"Expand"}
-              style={{ cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                padding:"6px 0", borderTop:"1px solid rgba(255,255,255,.07)",
-                color:"rgba(255,255,255,.35)", fontSize:14, userSelect:"none",
-                background:"rgba(255,255,255,.04)", flexShrink:0 }}>
-              {open ? "⟨⟩" : "⟩⟨"}
-            </div>
+          const gripIcon = (setter, direction) => (
+            <span onMouseDown={e=>startDrag(e, setter, direction)} title="Drag to resize"
+              style={{ cursor:"col-resize", fontSize:11, color:"rgba(255,255,255,.3)", userSelect:"none",
+                flexShrink:0, letterSpacing:-1, padding:"0 2px" }}>⠿</span>
           );
+
+          const leftCollapsed  = leftWidth  <= MIN_SIDEBAR + 10;
+          const rightCollapsed = rightWidth <= MIN_SIDEBAR + 10;
 
           return (
             <React.Fragment>
               {/* LEFT sidebar */}
-              <div style={{...sidebarBase, width:leftOpen?148:28, marginRight:8}}>
-                {leftOpen && (
-                  <div style={sidebarHead}>
-                    {addBtn}
-                    <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>
-                  </div>
-                )}
-                {leftOpen && (
+              <div style={{...sidebarBase, width:leftWidth, marginRight:8}}>
+                <div style={sidebarHead}>
+                  {!leftCollapsed && addBtn}
+                  {!leftCollapsed && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
+                  {gripIcon(setLeftWidth, "left")}
+                </div>
+                {!leftCollapsed && (
                   <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
                     <QuickList items={leftItems} startNum={1}
                       onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
                   </div>
                 )}
-                {expandBtn(leftOpen, ()=>setLeftOpen(o=>!o))}
               </div>
 
               {/* CENTER panel */}
@@ -845,20 +856,18 @@ function OSApp() {
               </div>{/* end cc-panel */}
 
               {/* RIGHT sidebar */}
-              <div style={{...sidebarBase, width:rightOpen?148:28, marginLeft:8}}>
-                {rightOpen && (
-                  <div style={sidebarHead}>
-                    {addBtn}
-                    <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>
-                  </div>
-                )}
-                {rightOpen && (
+              <div style={{...sidebarBase, width:rightWidth, marginLeft:8}}>
+                <div style={sidebarHead}>
+                  {gripIcon(setRightWidth, "right")}
+                  {!rightCollapsed && addBtn}
+                  {!rightCollapsed && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
+                </div>
+                {!rightCollapsed && (
                   <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
                     <QuickList items={rightItems} startNum={half+1}
                       onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
                   </div>
                 )}
-                {expandBtn(rightOpen, ()=>setRightOpen(o=>!o))}
               </div>
             </React.Fragment>
           );
