@@ -191,6 +191,16 @@ function OSApp() {
   const [tabLabels,    setTabLabels]    = oS(()=>{
     try { return JSON.parse(localStorage.getItem("lv_tab_labels")||"{}"); } catch{ return {}; }
   });
+  /* menu order: array of item IDs — persisted */
+  const [menuOrder,    setMenuOrder]    = oS(()=>{
+    try { return JSON.parse(localStorage.getItem("lv_menu_order")||"null"); } catch{ return null; }
+  });
+  /* hidden menu items (deleted static ones) */
+  const [menuHidden,   setMenuHidden]   = oS(()=>{
+    try { return JSON.parse(localStorage.getItem("lv_menu_hidden")||"[]"); } catch{ return []; }
+  });
+  const [menuDragIdx,  setMenuDragIdx]  = oS(null);
+  const [menuDragOver, setMenuDragOver] = oS(null);
 
   const dragIdx        = oR(null);
   const [dragOver,     setDragOver]     = oS(null);   // index being hovered
@@ -221,6 +231,42 @@ function OSApp() {
 
   const tabLabelsRef = oR(tabLabels);
   tabLabelsRef.current = tabLabels;
+
+  /* compute ordered menu items */
+  const orderedMenuItems = oM(() => {
+    const builtins = [
+      { id:"label_localhost", type:"label",  deletable:false, label: tabLabels["label_localhost"]||"localhost", bold:true },
+      { id:"label_view",      type:"label",  deletable:true,  label: tabLabels["label_view"]||"View" },
+      { id:"servers",         type:"tab",    deletable:false, label: tabLabels["servers"]||"Servers" },
+      { id:"label_window",    type:"label",  deletable:true,  label: tabLabels["label_window"]||"Window" },
+      { id:"websites",        type:"tab",    deletable:false, label: tabLabels["websites"]||"Websites" },
+    ];
+    const colItems = collections.map(c=>({ id:c.id, type:"collection", deletable:true, label:c.label }));
+    const allItems = [...builtins, ...colItems];
+    const defaultOrder = allItems.map(x=>x.id);
+    const order = menuOrder || defaultOrder;
+    // merge: keep saved order, append any new items not in order yet
+    const seen = new Set(order);
+    const full = [...order, ...defaultOrder.filter(id=>!seen.has(id))];
+    return full
+      .filter(id => !menuHidden.includes(id))
+      .map(id => allItems.find(x=>x.id===id))
+      .filter(Boolean);
+  }, [menuOrder, menuHidden, collections, tabLabels]);
+
+  const reorderMenu = (fromIdx, toIdx) => {
+    if (fromIdx === toIdx || fromIdx == null) return;
+    const ids = orderedMenuItems.map(x=>x.id);
+    const [item] = ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, item);
+    setMenuOrder(ids);
+    try { localStorage.setItem("lv_menu_order", JSON.stringify(ids)); } catch{}
+    setMenuDragIdx(null); setMenuDragOver(null);
+  };
+
+  const hideMenuItem = id => {
+    setMenuHidden(prev=>{ const next=[...prev,id]; try{localStorage.setItem("lv_menu_hidden",JSON.stringify(next));}catch{} return next; });
+  };
 
   /* sync-save helpers — called immediately inside every mutation */
   const saveTabLabels = tl => {
@@ -429,40 +475,63 @@ function OSApp() {
     <div className="desktop">
       {/* ── menu bar ── */}
       <div className="menubar">
-        <div className="mb-left">
+        <div className="mb-left" style={{ display:"flex", alignItems:"center" }}>
           <div className="mb-logo"><span className="dot">{DI.bolt}</span></div>
-          <span className="mb-item bold">
-            <InlineRename value={tabLabels["label_localhost"]||"localhost"} onSave={v=>renameBuiltinTab("label_localhost",v)}/>
-          </span>
-          <span className="mb-item">
-            <InlineRename value={tabLabels["label_view"]||"View"} onSave={v=>renameBuiltinTab("label_view",v)}/>
-          </span>
-          <CollectionTab
-            c={{ id:"servers", label: tabLabels["servers"] || "Servers" }}
-            active={isServers}
-            onSelect={()=>{ setTab("servers"); localStorage.setItem("lv_tab","servers"); setQuery(""); }}
-            onRename={name=>renameBuiltinTab("servers",name)}
-            onDelete={null}
-          />
-          <span className="mb-item">
-            <InlineRename value={tabLabels["label_window"]||"Window"} onSave={v=>renameBuiltinTab("label_window",v)}/>
-          </span>
-          <CollectionTab
-            c={{ id:"websites", label: tabLabels["websites"] || "Websites" }}
-            active={isWebsites}
-            onSelect={()=>{ setTab("websites"); localStorage.setItem("lv_tab","websites"); setQuery(""); }}
-            onRename={name=>renameBuiltinTab("websites",name)}
-            onDelete={null}
-          />
 
-          {/* ── custom collection tabs ── */}
-          {collections.map(c=>(
-            <CollectionTab key={c.id} c={c} active={tab===c.id}
-              onSelect={()=>{ setTab(c.id); localStorage.setItem("lv_tab",c.id); setQuery(""); }}
-              onRename={name=>{ setCollections(cs=>{ const next=cs.map(x=>x.id===c.id?{...x,label:name}:x); saveCollections(next); return next; }); }}
-              onDelete={()=>{ setCollections(cs=>{ const next=cs.filter(x=>x.id!==c.id); saveCollections(next); return next; }); if(tab===c.id){ setTab("websites"); localStorage.setItem("lv_tab","websites"); } }}
-            />
-          ))}
+          {/* ── ordered, draggable menu items ── */}
+          {orderedMenuItems.map((item, i) => {
+            const dragProps = {
+              draggable: true,
+              onDragStart: e=>{ e.dataTransfer.effectAllowed="move"; setMenuDragIdx(i); },
+              onDragOver:  e=>{ e.preventDefault(); setMenuDragOver(i); },
+              onDrop:      e=>{ e.preventDefault(); reorderMenu(menuDragIdx, i); },
+              onDragEnd:   ()=>{ setMenuDragIdx(null); setMenuDragOver(null); },
+              style: {
+                opacity:    menuDragIdx===i ? 0.4 : 1,
+                outline:    menuDragOver===i && menuDragIdx!==i ? "2px solid var(--amber)" : "none",
+                outlineOffset: 2, borderRadius:4, transition:"opacity .15s",
+              }
+            };
+
+            if (item.type === "label") return (
+              <span key={item.id} className={`mb-item${item.bold?" bold":""}`} {...dragProps}>
+                <CollectionTab
+                  c={{ id:item.id, label:item.label }}
+                  active={false}
+                  onSelect={null}
+                  onRename={name=>renameBuiltinTab(item.id, name)}
+                  onDelete={item.deletable ? ()=>hideMenuItem(item.id) : null}
+                />
+              </span>
+            );
+
+            if (item.type === "tab") return (
+              <span key={item.id} {...dragProps}>
+                <CollectionTab
+                  c={{ id:item.id, label:item.label }}
+                  active={tab===item.id}
+                  onSelect={()=>{ setTab(item.id); localStorage.setItem("lv_tab",item.id); setQuery(""); }}
+                  onRename={name=>renameBuiltinTab(item.id, name)}
+                  onDelete={null}
+                />
+              </span>
+            );
+
+            if (item.type === "collection") {
+              const col = collections.find(c=>c.id===item.id);
+              if (!col) return null;
+              return (
+                <span key={item.id} {...dragProps}>
+                  <CollectionTab c={col} active={tab===col.id}
+                    onSelect={()=>{ setTab(col.id); localStorage.setItem("lv_tab",col.id); setQuery(""); }}
+                    onRename={name=>{ setCollections(cs=>{ const next=cs.map(x=>x.id===col.id?{...x,label:name}:x); saveCollections(next); return next; }); }}
+                    onDelete={()=>{ setCollections(cs=>{ const next=cs.filter(x=>x.id!==col.id); saveCollections(next); return next; }); if(tab===col.id){ setTab("websites"); localStorage.setItem("lv_tab","websites"); } }}
+                  />
+                </span>
+              );
+            }
+            return null;
+          })}
 
           {/* ── new tab button / inline input ── */}
           {addingTab
