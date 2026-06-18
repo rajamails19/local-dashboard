@@ -162,6 +162,79 @@ function InlineRename({ value, onSave }) {
   );
 }
 
+/* ── Quick-link sidebar item ── */
+function QuickItem({ num, name, url, onEditName, onEditUrl, onDelete }) {
+  const [editingName, setEditingName] = oS(false);
+  const [editingUrl,  setEditingUrl]  = oS(false);
+  const [nameVal,     setNameVal]     = oS(name);
+  const [urlVal,      setUrlVal]      = oS(url);
+  oE(()=>setNameVal(name),[name]);
+  oE(()=>setUrlVal(url),[url]);
+
+  const commitName = () => { setEditingName(false); if(nameVal.trim() && nameVal!==name) onEditName(nameVal.trim()); };
+  const commitUrl  = () => { setEditingUrl(false);  if(urlVal.trim()  && urlVal!==url)   onEditUrl(urlVal.trim()); };
+
+  const href = url && (url.startsWith("http")?url:"https://"+url);
+
+  return (
+    <div style={{ display:"flex", alignItems:"flex-start", gap:5, padding:"4px 0", borderBottom:"1px solid rgba(255,255,255,.06)" }}>
+      <span style={{ fontSize:10, color:"rgba(255,255,255,.3)", minWidth:16, paddingTop:2, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{num}</span>
+      <div style={{ flex:1, minWidth:0 }}>
+        {/* name row */}
+        {editingName
+          ? <input autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)}
+              onBlur={commitName} onKeyDown={e=>{ if(e.key==="Enter") commitName(); if(e.key==="Escape") setEditingName(false); }}
+              style={{ width:"100%", background:"rgba(255,255,255,.1)", border:"none", borderBottom:"1px solid var(--amber)", outline:"none", color:"#fff", fontSize:11, fontFamily:"inherit", borderRadius:2 }}/>
+          : <span onClick={()=>href&&window.open(href,"_blank")} title={href||"no URL"}
+              style={{ fontSize:11, fontWeight:600, color: href?"rgba(255,255,255,.9)":"rgba(255,255,255,.4)", cursor:href?"pointer":"default",
+                display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                textDecoration: href?"underline":"none", textUnderlineOffset:2 }}>
+              {name||"(unnamed)"}
+            </span>
+        }
+        {/* url row */}
+        {editingUrl
+          ? <input autoFocus value={urlVal} onChange={e=>setUrlVal(e.target.value)}
+              onBlur={commitUrl} onKeyDown={e=>{ if(e.key==="Enter") commitUrl(); if(e.key==="Escape") setEditingUrl(false); }}
+              style={{ width:"100%", background:"rgba(255,255,255,.1)", border:"none", borderBottom:"1px solid rgba(255,255,255,.3)", outline:"none", color:"rgba(255,255,255,.6)", fontSize:9, fontFamily:"inherit", borderRadius:2, marginTop:1 }}/>
+          : url
+            ? <span onClick={()=>onEditUrl&&setEditingUrl(true)}
+                style={{ fontSize:9, color:"rgba(255,255,255,.35)", display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:"text", marginTop:1 }}>
+                {url}
+              </span>
+            : <span onClick={()=>onEditUrl&&setEditingUrl(true)}
+                style={{ fontSize:9, color:"rgba(255,255,255,.2)", cursor:"text", marginTop:1, display:"block" }}>+ add url</span>
+        }
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:2, flexShrink:0 }}>
+        <span onClick={()=>setEditingName(true)} title="Edit name"
+          style={{ cursor:"pointer", fontSize:9, color:"rgba(255,255,255,.3)", lineHeight:1, padding:"1px 2px" }}>✎</span>
+        <span onClick={onDelete} title="Remove"
+          style={{ cursor:"pointer", fontSize:9, color:"rgba(255,80,80,.5)", lineHeight:1, padding:"1px 2px" }}>✕</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Quick-link sidebar column ── */
+function QuickList({ items, onEditName, onEditUrl, onDelete, startNum=1 }) {
+  if (!items || items.length === 0) return (
+    <div style={{ padding:"12px 8px", color:"rgba(255,255,255,.2)", fontSize:10, textAlign:"center" }}>—</div>
+  );
+  return (
+    <div style={{ padding:"0 4px" }}>
+      {items.map((item, i) => (
+        <QuickItem key={item.id} num={startNum+i}
+          name={item.name} url={item.url}
+          onEditName={v=>onEditName(item, v)}
+          onEditUrl={v=>onEditUrl(item, v)}
+          onDelete={()=>onDelete(item)}
+        />
+      ))}
+    </div>
+  );
+}
+
 function OSApp() {
   /* ── state ── */
   const [projects,     setProjects]     = oS([]);
@@ -624,8 +697,57 @@ function OSApp() {
       </div>
 
       {/* ── stage ── */}
-      <div className="stage">
-        <div className="cc-panel">
+      <div className="stage" style={{ flexDirection:"row", alignItems:"flex-start", padding:"26px 12px 8px" }}>
+        {/* sidebar data */}
+        {(()=>{
+          const quickItems = isServers
+            ? filteredServers.map(p=>({ id:p.id, name:p.displayName||p.name, url: p.frontend.port?`http://localhost:${p.frontend.port}`:null, _type:"server", _p:p }))
+            : gridItems.map(w=>({ id:w.id, name:w.displayName||w.name, url:w.url, _type:"web", _w:w }));
+
+          const half = Math.ceil(quickItems.length / 2);
+          const leftItems  = quickItems.slice(0, half);
+          const rightItems = quickItems.slice(half);
+
+          const handleEditName = (item, v) => {
+            if(item._type==="server") rename(item._p, v);
+            else if(isCollection) updateCollectionWebsite(activeCollection.id, item._w, { displayName:v });
+            else updateWebsite(item._w, { displayName:v });
+          };
+          const handleEditUrl = (item, v) => {
+            if(item._type==="web") {
+              if(isCollection) updateCollectionWebsite(activeCollection.id, item._w, { url:v });
+              else updateWebsite(item._w, { url:v });
+            }
+          };
+          const handleDelete = (item) => {
+            if(item._type==="server") return; // servers can't be deleted from sidebar
+            if(isCollection) deleteCollectionItem(activeCollection.id, item._w);
+            else deleteWebsite(item._w);
+          };
+
+          const sidebarStyle = {
+            width:148, flexShrink:0, alignSelf:"stretch",
+            background:"rgba(0,0,0,.18)", borderRadius:14,
+            overflow:"hidden", display:"flex", flexDirection:"column",
+          };
+          const sidebarHead = {
+            fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
+            color:"rgba(255,255,255,.3)", padding:"8px 10px 4px", borderBottom:"1px solid rgba(255,255,255,.07)"
+          };
+
+          return (
+            <React.Fragment>
+              {/* LEFT sidebar */}
+              <div style={{...sidebarStyle, marginRight:8}}>
+                <div style={sidebarHead}>Quick Links</div>
+                <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
+                  <QuickList items={leftItems} startNum={1}
+                    onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+                </div>
+              </div>
+
+              {/* CENTER panel */}
+              <div className="cc-panel" style={{ flex:1, minWidth:0, width:"auto" }}>
           <div className="cc-head">
             {isServers ? (
               <React.Fragment>
@@ -693,7 +815,19 @@ function OSApp() {
                   ))
             )}
           </div>
-        </div>
+              </div>{/* end cc-panel */}
+
+              {/* RIGHT sidebar */}
+              <div style={{...sidebarStyle, marginLeft:8}}>
+                <div style={sidebarHead}>Quick Links</div>
+                <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
+                  <QuickList items={rightItems} startNum={half+1}
+                    onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+                </div>
+              </div>
+            </React.Fragment>
+          );
+        })()}
       </div>
 
       {/* ── dock (servers only) ── */}
