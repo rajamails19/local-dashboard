@@ -7,13 +7,41 @@ const TAG_CHIPS = ["ai","kids","education","telugu","fullstack","pwa","game","do
 
 function wFw(fw) { return (window.FW && window.FW[fw]) || { glyph: "vite", color: "#a06bff" }; }
 
-function SiteIcon({ id, size = 46 }) {
-  const info = (window.SITE_ICONS || {})[id];
+/* compress uploaded image to a small base64 thumbnail */
+function compressImage(file, maxPx = 120) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/webp", 0.82));
+    };
+    img.src = url;
+  });
+}
+
+function SiteIcon({ id, customImage, size = 46 }) {
   const borderRadius = Math.round(size * 0.28);
+  const shadow = "0 4px 12px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.12)";
+
+  /* custom uploaded image takes priority */
+  if (customImage) {
+    return (
+      <div style={{ width: size, height: size, borderRadius, flexShrink: 0, overflow: "hidden", boxShadow: shadow }}>
+        <img src={customImage} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      </div>
+    );
+  }
+
+  const info = (window.SITE_ICONS || {})[id];
   if (info) {
     const bg = `linear-gradient(135deg, ${info.bg[0]}, ${info.bg[1]})`;
     return (
-      <div style={{ width: size, height: size, borderRadius, background: bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.12)" }}>
+      <div style={{ width: size, height: size, borderRadius, background: bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: shadow }}>
         <span dangerouslySetInnerHTML={{ __html: info.svg }} style={{ width: size * .72, height: size * .72, display: "flex" }} />
       </div>
     );
@@ -40,7 +68,7 @@ function WebTile({ w, onOpen, draggable, onDragStart, onDragOver, onDrop, onDrag
       onDragEnd={onDragEnd}
       onClick={() => onOpen(w)}>
       <div className="tile-top">
-        <SiteIcon id={w.id} size={46} />
+        <SiteIcon id={w.id} customImage={w.customImage} size={46} />
         <div className="tile-id">
           <div className="nm">{label}</div>
           <div className="fw">{w.framework}</div>
@@ -157,11 +185,13 @@ function TagsEditor({ tags, color, onSave }) {
 }
 
 function WebWindow({ w, onClose, onUpdate, onDelete }) {
-  const [copied,   setCopied]   = React.useState(false);
-  const [editUrl,  setEditUrl]  = React.useState("");
-  const [urlFocus, setUrlFocus] = React.useState(false);
-  const [fwOpen,   setFwOpen]   = React.useState(false);
+  const [copied,     setCopied]     = React.useState(false);
+  const [editUrl,    setEditUrl]    = React.useState("");
+  const [urlFocus,   setUrlFocus]   = React.useState(false);
+  const [fwOpen,     setFwOpen]     = React.useState(false);
   const [confirmDel, setConfirmDel] = React.useState(false);
+  const [iconHover,  setIconHover]  = React.useState(false);
+  const fileRef = React.useRef(null);
 
   React.useEffect(() => { setEditUrl(w ? (w.url || "") : ""); setConfirmDel(false); }, [w && w.id]);
   React.useEffect(() => {
@@ -204,9 +234,30 @@ function WebWindow({ w, onClose, onUpdate, onDelete }) {
         </div>
 
         <div className="win-body">
+          {/* hidden file input */}
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }}
+            onChange={async e => {
+              const file = e.target.files[0]; if (!file) return;
+              const b64 = await compressImage(file);
+              onUpdate(w, { customImage: b64 });
+              e.target.value = "";
+            }} />
+
           {/* hero — name (click to edit) */}
           <div className="win-hero">
-            <SiteIcon id={w.id} size={60} />
+            <div style={{ position:"relative", flexShrink:0, cursor:"pointer" }}
+              onMouseEnter={()=>setIconHover(true)} onMouseLeave={()=>setIconHover(false)}
+              onClick={()=>fileRef.current.click()} title="Click to upload custom icon">
+              <SiteIcon id={w.id} customImage={w.customImage} size={60} />
+              {iconHover && (
+                <div style={{ position:"absolute", inset:0, borderRadius: Math.round(60*.28), background:"rgba(0,0,0,.55)",
+                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 }}>
+                  <span style={{ fontSize:18 }}>📷</span>
+                  <span style={{ fontSize:9, color:"#fff", fontWeight:700, letterSpacing:".04em" }}>UPLOAD</span>
+                </div>
+              )}
+            </div>
+
             <div className="win-hid">
               <EditField label="" value={label} onSave={v => onUpdate(w, { displayName: v })}
               />
