@@ -212,6 +212,21 @@ function OSApp() {
   collectionsRef.current = collections;
   const websitesRef    = oR(websites);
   websitesRef.current  = websites;
+  const tabLabelsRef2  = oR(tabLabels);
+  tabLabelsRef2.current = tabLabels;
+  const menuOrderRef   = oR(menuOrder);
+  menuOrderRef.current = menuOrder;
+  const menuHiddenRef  = oR(menuHidden);
+  menuHiddenRef.current = menuHidden;
+
+  /* full payload for remote save */
+  const fullPayload = () => ({
+    collections: collectionsRef.current,
+    websites:    websitesRef.current,
+    tabLabels:   tabLabelsRef2.current,
+    menuOrder:   menuOrderRef.current,
+    menuHidden:  menuHiddenRef.current,
+  });
 
   /* load from remote on first mount (Vercel only) */
   oE(()=>{
@@ -225,6 +240,18 @@ function OSApp() {
       if (Array.isArray(data.websites) && data.websites.length > 0) {
         setWebsites(data.websites);
         try { localStorage.setItem("lv_websites", JSON.stringify(data.websites)); } catch{}
+      }
+      if (data.tabLabels && Object.keys(data.tabLabels).length > 0) {
+        setTabLabels(data.tabLabels);
+        try { localStorage.setItem("lv_tab_labels", JSON.stringify(data.tabLabels)); } catch{}
+      }
+      if (Array.isArray(data.menuOrder) && data.menuOrder.length > 0) {
+        setMenuOrder(data.menuOrder);
+        try { localStorage.setItem("lv_menu_order", JSON.stringify(data.menuOrder)); } catch{}
+      }
+      if (Array.isArray(data.menuHidden)) {
+        setMenuHidden(data.menuHidden);
+        try { localStorage.setItem("lv_menu_hidden", JSON.stringify(data.menuHidden)); } catch{}
       }
     });
   }, []);
@@ -261,16 +288,23 @@ function OSApp() {
     ids.splice(toIdx, 0, item);
     setMenuOrder(ids);
     try { localStorage.setItem("lv_menu_order", JSON.stringify(ids)); } catch{}
+    if (REMOTE) remoteSave({...fullPayload(), menuOrder: ids});
     setMenuDragIdx(null); setMenuDragOver(null);
   };
 
   const hideMenuItem = id => {
-    setMenuHidden(prev=>{ const next=[...prev,id]; try{localStorage.setItem("lv_menu_hidden",JSON.stringify(next));}catch{} return next; });
+    setMenuHidden(prev=>{
+      const next=[...prev,id];
+      try{localStorage.setItem("lv_menu_hidden",JSON.stringify(next));}catch{}
+      if (REMOTE) remoteSave({...fullPayload(), menuHidden: next});
+      return next;
+    });
   };
 
   /* sync-save helpers — called immediately inside every mutation */
   const saveTabLabels = tl => {
     try { localStorage.setItem("lv_tab_labels", JSON.stringify(tl)); } catch{}
+    if (REMOTE) remoteSave({...fullPayload(), tabLabels: tl});
     return tl;
   };
   const renameBuiltinTab = (key, label) => {
@@ -278,12 +312,12 @@ function OSApp() {
   };
   const saveCollections = cs => {
     try { localStorage.setItem("lv_collections", JSON.stringify(cs)); } catch{}
-    if (REMOTE) remoteSave({ collections: cs, websites: websitesRef.current });
+    if (REMOTE) remoteSave({...fullPayload(), collections: cs});
     return cs;
   };
   const saveWebsites = ws => {
     try { localStorage.setItem("lv_websites", JSON.stringify(ws)); } catch{}
-    if (REMOTE) remoteSave({ collections: collectionsRef.current, websites: ws });
+    if (REMOTE) remoteSave({...fullPayload(), websites: ws});
     return ws;
   };
 
