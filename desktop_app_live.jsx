@@ -736,38 +736,41 @@ function OSApp() {
             fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
             color:"rgba(255,255,255,.3)", padding:"8px 8px 4px",
             borderBottom:"1px solid rgba(255,255,255,.07)",
-            display:"flex", alignItems:"center", justifyContent:"space-between", gap:4,
+            display:"flex", alignItems:"center", gap:4,
           };
-          const toggleBtn = (open, onClick, side) => (
-            <span onClick={onClick} title={open?"Collapse":"Expand"}
-              style={{ cursor:"pointer", fontSize:11, color:"rgba(255,255,255,.4)", lineHeight:1,
-                background:"rgba(255,255,255,.08)", borderRadius:4, padding:"2px 5px",
-                userSelect:"none", flexShrink:0 }}>
-              {side==="left" ? (open?"◀":"▶") : (open?"▶":"◀")}
-            </span>
-          );
           const addBtn = (
             <span onClick={openAdd} title="Add new"
               style={{ cursor:"pointer", fontSize:13, fontWeight:700, color:"rgba(255,255,255,.5)",
                 lineHeight:1, background:"rgba(255,255,255,.08)", borderRadius:4, padding:"1px 5px",
                 userSelect:"none", flexShrink:0 }}>+</span>
           );
+          const expandBtn = (open, onClick) => (
+            <div onClick={onClick} title={open?"Minimize":"Expand"}
+              style={{ cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                padding:"6px 0", borderTop:"1px solid rgba(255,255,255,.07)",
+                color:"rgba(255,255,255,.35)", fontSize:14, userSelect:"none",
+                background:"rgba(255,255,255,.04)", flexShrink:0 }}>
+              {open ? "⟨⟩" : "⟩⟨"}
+            </div>
+          );
 
           return (
             <React.Fragment>
               {/* LEFT sidebar */}
               <div style={{...sidebarBase, width:leftOpen?148:28, marginRight:8}}>
-                <div style={sidebarHead}>
-                  {leftOpen && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
-                  {leftOpen && addBtn}
-                  {toggleBtn(leftOpen, ()=>setLeftOpen(o=>!o), "left")}
-                </div>
+                {leftOpen && (
+                  <div style={sidebarHead}>
+                    {addBtn}
+                    <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>
+                  </div>
+                )}
                 {leftOpen && (
                   <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
                     <QuickList items={leftItems} startNum={1}
                       onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
                   </div>
                 )}
+                {expandBtn(leftOpen, ()=>setLeftOpen(o=>!o))}
               </div>
 
               {/* CENTER panel */}
@@ -843,17 +846,19 @@ function OSApp() {
 
               {/* RIGHT sidebar */}
               <div style={{...sidebarBase, width:rightOpen?148:28, marginLeft:8}}>
-                <div style={sidebarHead}>
-                  {toggleBtn(rightOpen, ()=>setRightOpen(o=>!o), "right")}
-                  {rightOpen && addBtn}
-                  {rightOpen && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
-                </div>
+                {rightOpen && (
+                  <div style={sidebarHead}>
+                    {addBtn}
+                    <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>
+                  </div>
+                )}
                 {rightOpen && (
                   <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
                     <QuickList items={rightItems} startNum={half+1}
                       onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
                   </div>
                 )}
+                {expandBtn(rightOpen, ()=>setRightOpen(o=>!o))}
               </div>
             </React.Fragment>
           );
