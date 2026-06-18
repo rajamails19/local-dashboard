@@ -17,12 +17,13 @@ async function remoteLoad() {
 }
 async function remoteSave(payload) {
   try {
-    await fetch("/api/store", {
+    const r = await fetch("/api/store", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch {}
+    if (!r.ok) console.error("[remoteSave] HTTP", r.status, await r.text().catch(()=>""));
+  } catch(e) { console.error("[remoteSave] fetch error:", e); }
 }
 
 /* ── server data transform ── */
@@ -201,6 +202,7 @@ function OSApp() {
   });
   const [menuDragIdx,  setMenuDragIdx]  = oS(null);
   const [menuDragOver, setMenuDragOver] = oS(null);
+  const [syncStatus,   setSyncStatus]   = oS("idle"); // "idle" | "saving" | "ok" | "error"
 
   const dragIdx        = oR(null);
   const [dragOver,     setDragOver]     = oS(null);   // index being hovered
@@ -219,6 +221,18 @@ function OSApp() {
   const menuHiddenRef  = oR(menuHidden);
   menuHiddenRef.current = menuHidden;
 
+  /* tracked remote save */
+  const doSave = payload => {
+    if (!REMOTE) return;
+    setSyncStatus("saving");
+    remoteSave(payload).then(()=>{
+      setSyncStatus("ok");
+      setTimeout(()=>setSyncStatus("idle"), 2000);
+    }).catch(()=>{
+      setSyncStatus("error");
+    });
+  };
+
   /* full payload for remote save */
   const fullPayload = () => ({
     collections: collectionsRef.current,
@@ -228,33 +242,46 @@ function OSApp() {
     menuHidden:  menuHiddenRef.current,
   });
 
+  /* apply remote data to state + localStorage */
+  const applyRemoteData = oCB(data => {
+    if (!data) return;
+    if (Array.isArray(data.collections)) {
+      setCollections(data.collections);
+      try { localStorage.setItem("lv_collections", JSON.stringify(data.collections)); } catch{}
+    }
+    if (Array.isArray(data.websites)) {
+      setWebsites(data.websites);
+      try { localStorage.setItem("lv_websites", JSON.stringify(data.websites)); } catch{}
+    }
+    if (data.tabLabels && typeof data.tabLabels === "object") {
+      setTabLabels(data.tabLabels);
+      try { localStorage.setItem("lv_tab_labels", JSON.stringify(data.tabLabels)); } catch{}
+    }
+    if (Array.isArray(data.menuOrder)) {
+      setMenuOrder(data.menuOrder);
+      try { localStorage.setItem("lv_menu_order", JSON.stringify(data.menuOrder)); } catch{}
+    }
+    if (Array.isArray(data.menuHidden)) {
+      setMenuHidden(data.menuHidden);
+      try { localStorage.setItem("lv_menu_hidden", JSON.stringify(data.menuHidden)); } catch{}
+    }
+  }, []);
+
   /* load from remote on first mount (Vercel only) */
   oE(()=>{
     if (!REMOTE) return;
-    remoteLoad().then(data => {
-      if (!data) return;
-      if (Array.isArray(data.collections) && data.collections.length > 0) {
-        setCollections(data.collections);
-        try { localStorage.setItem("lv_collections", JSON.stringify(data.collections)); } catch{}
-      }
-      if (Array.isArray(data.websites) && data.websites.length > 0) {
-        setWebsites(data.websites);
-        try { localStorage.setItem("lv_websites", JSON.stringify(data.websites)); } catch{}
-      }
-      if (data.tabLabels && Object.keys(data.tabLabels).length > 0) {
-        setTabLabels(data.tabLabels);
-        try { localStorage.setItem("lv_tab_labels", JSON.stringify(data.tabLabels)); } catch{}
-      }
-      if (Array.isArray(data.menuOrder) && data.menuOrder.length > 0) {
-        setMenuOrder(data.menuOrder);
-        try { localStorage.setItem("lv_menu_order", JSON.stringify(data.menuOrder)); } catch{}
-      }
-      if (Array.isArray(data.menuHidden)) {
-        setMenuHidden(data.menuHidden);
-        try { localStorage.setItem("lv_menu_hidden", JSON.stringify(data.menuHidden)); } catch{}
-      }
-    });
+    remoteLoad().then(applyRemoteData);
   }, []);
+
+  /* poll every 30s + re-sync when tab becomes visible */
+  oE(()=>{
+    if (!REMOTE) return;
+    const poll = () => remoteLoad().then(applyRemoteData);
+    const interval = setInterval(poll, 30000);
+    const onVisible = () => { if (document.visibilityState === "visible") poll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
+  }, [applyRemoteData]);
 
   const tabLabelsRef = oR(tabLabels);
   tabLabelsRef.current = tabLabels;
@@ -288,7 +315,7 @@ function OSApp() {
     ids.splice(toIdx, 0, item);
     setMenuOrder(ids);
     try { localStorage.setItem("lv_menu_order", JSON.stringify(ids)); } catch{}
-    if (REMOTE) remoteSave({...fullPayload(), menuOrder: ids});
+    doSave({...fullPayload(), menuOrder: ids});
     setMenuDragIdx(null); setMenuDragOver(null);
   };
 
@@ -296,7 +323,7 @@ function OSApp() {
     setMenuHidden(prev=>{
       const next=[...prev,id];
       try{localStorage.setItem("lv_menu_hidden",JSON.stringify(next));}catch{}
-      if (REMOTE) remoteSave({...fullPayload(), menuHidden: next});
+      doSave({...fullPayload(), menuHidden: next});
       return next;
     });
   };
@@ -304,7 +331,7 @@ function OSApp() {
   /* sync-save helpers — called immediately inside every mutation */
   const saveTabLabels = tl => {
     try { localStorage.setItem("lv_tab_labels", JSON.stringify(tl)); } catch{}
-    if (REMOTE) remoteSave({...fullPayload(), tabLabels: tl});
+    doSave({...fullPayload(), tabLabels: tl});
     return tl;
   };
   const renameBuiltinTab = (key, label) => {
@@ -312,12 +339,12 @@ function OSApp() {
   };
   const saveCollections = cs => {
     try { localStorage.setItem("lv_collections", JSON.stringify(cs)); } catch{}
-    if (REMOTE) remoteSave({...fullPayload(), collections: cs});
+    doSave({...fullPayload(), collections: cs});
     return cs;
   };
   const saveWebsites = ws => {
     try { localStorage.setItem("lv_websites", JSON.stringify(ws)); } catch{}
-    if (REMOTE) remoteSave({...fullPayload(), websites: ws});
+    doSave({...fullPayload(), websites: ws});
     return ws;
   };
 
@@ -588,6 +615,7 @@ function OSApp() {
           </div>
           <span className="mb-clock">{clock}</span>
           <span style={{fontSize:9,marginLeft:4,color:connected?"#34d058":"#ff5f57"}} title={connected?"Live":"Reconnecting"}>●</span>
+          {REMOTE && <span style={{fontSize:9,marginLeft:3,color:syncStatus==="ok"?"#34d058":syncStatus==="error"?"#ff5f57":syncStatus==="saving"?"#f5a623":"rgba(255,255,255,.3)"}} title={syncStatus==="ok"?"Synced":syncStatus==="error"?"Sync failed":syncStatus==="saving"?"Saving…":"Cloud sync"}>⟳</span>}
         </div>
       </div>
 
