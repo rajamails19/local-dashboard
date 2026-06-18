@@ -6,8 +6,12 @@ const { useState: oS, useEffect: oE, useMemo: oM, useRef: oR, useCallback: oCB }
 /* ── cross-file component refs ── */
 const AddModal = window.AddModal;
 
-/* ── Remote store (Gist via /api/store) — always on; both localhost + Vercel sync ── */
-const REMOTE = true;
+/* ── Remote store (Gist via /api/store) ──
+   REMOTE_READ  = true on both localhost + Vercel  → always pull latest from Gist
+   REMOTE_WRITE = true only on Vercel              → local changes stay local until you push
+── */
+const REMOTE_READ  = true;
+const REMOTE_WRITE = typeof window !== "undefined" && window.location.hostname !== "localhost";
 async function remoteLoad() {
   try {
     const r = await fetch("/api/store");
@@ -221,9 +225,9 @@ function OSApp() {
   const menuHiddenRef  = oR(menuHidden);
   menuHiddenRef.current = menuHidden;
 
-  /* tracked remote save */
+  /* tracked remote save — only fires on Vercel, not localhost */
   const doSave = payload => {
-    if (!REMOTE) return;
+    if (!REMOTE_WRITE) return;
     setSyncStatus("saving");
     remoteSave(payload).then(()=>{
       setSyncStatus("ok");
@@ -267,15 +271,15 @@ function OSApp() {
     }
   }, []);
 
-  /* load from remote on first mount (Vercel only) */
+  /* load from remote on first mount — always, on both localhost + Vercel */
   oE(()=>{
-    if (!REMOTE) return;
+    if (!REMOTE_READ) return;
     remoteLoad().then(applyRemoteData);
   }, []);
 
-  /* poll every 30s + re-sync when tab becomes visible */
+  /* poll every 30s + re-sync when tab becomes visible — always */
   oE(()=>{
-    if (!REMOTE) return;
+    if (!REMOTE_READ) return;
     const poll = () => remoteLoad().then(applyRemoteData);
     const interval = setInterval(poll, 30000);
     const onVisible = () => { if (document.visibilityState === "visible") poll(); };
@@ -615,7 +619,7 @@ function OSApp() {
           </div>
           <span className="mb-clock">{clock}</span>
           <span style={{fontSize:9,marginLeft:4,color:connected?"#34d058":"#ff5f57"}} title={connected?"Live":"Reconnecting"}>●</span>
-          {REMOTE && <span style={{fontSize:9,marginLeft:3,color:syncStatus==="ok"?"#34d058":syncStatus==="error"?"#ff5f57":syncStatus==="saving"?"#f5a623":"rgba(255,255,255,.3)"}} title={syncStatus==="ok"?"Synced":syncStatus==="error"?"Sync failed":syncStatus==="saving"?"Saving…":"Cloud sync"}>⟳</span>}
+          {REMOTE_WRITE && <span style={{fontSize:9,marginLeft:3,color:syncStatus==="ok"?"#34d058":syncStatus==="error"?"#ff5f57":syncStatus==="saving"?"#f5a623":"rgba(255,255,255,.3)"}} title={syncStatus==="ok"?"Synced":syncStatus==="error"?"Sync failed":syncStatus==="saving"?"Saving…":"Cloud sync"}>⟳</span>}
         </div>
       </div>
 
