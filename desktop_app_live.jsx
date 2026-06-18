@@ -431,8 +431,12 @@ function OSApp() {
       <div className="menubar">
         <div className="mb-left">
           <div className="mb-logo"><span className="dot">{DI.bolt}</span></div>
-          <span className="mb-item bold">localhost</span>
-          <span className="mb-item">View</span>
+          <span className="mb-item bold">
+            <InlineRename value={tabLabels["label_localhost"]||"localhost"} onSave={v=>renameBuiltinTab("label_localhost",v)}/>
+          </span>
+          <span className="mb-item">
+            <InlineRename value={tabLabels["label_view"]||"View"} onSave={v=>renameBuiltinTab("label_view",v)}/>
+          </span>
           <CollectionTab
             c={{ id:"servers", label: tabLabels["servers"] || "Servers" }}
             active={isServers}
@@ -440,7 +444,9 @@ function OSApp() {
             onRename={name=>renameBuiltinTab("servers",name)}
             onDelete={null}
           />
-          <span className="mb-item">Window</span>
+          <span className="mb-item">
+            <InlineRename value={tabLabels["label_window"]||"Window"} onSave={v=>renameBuiltinTab("label_window",v)}/>
+          </span>
           <CollectionTab
             c={{ id:"websites", label: tabLabels["websites"] || "Websites" }}
             active={isWebsites}
