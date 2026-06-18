@@ -331,13 +331,11 @@ const GH_TOKEN = process.env.GH_TOKEN || '';
 const GH_URL   = `https://api.github.com/gists/${GIST_ID}`;
 const FILENAME = 'lv_store.json';
 
-function gistHeaders() {
-  return {
-    'Authorization': `token ${GH_TOKEN}`,
-    'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'local-dashboard',
-  };
+function gistHeaders(requireAuth) {
+  const h = { 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'local-dashboard' };
+  if (GH_TOKEN) h['Authorization'] = `token ${GH_TOKEN}`;
+  else if (requireAuth) console.warn('[store] GH_TOKEN not set — POST will fail. Set via: export GH_TOKEN=your_token');
+  return h;
 }
 
 async function handleStore(req, res) {
@@ -346,16 +344,10 @@ async function handleStore(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  if (!GH_TOKEN) {
-    console.warn('[store] GH_TOKEN not set — set it via: export GH_TOKEN=your_token');
-    res.writeHead(503, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'GH_TOKEN not configured' }));
-    return;
-  }
-
   if (req.method === 'GET') {
+    // GET works without a token for public gists
     try {
-      const r = await fetch(GH_URL, { headers: gistHeaders() });
+      const r = await fetch(GH_URL, { headers: gistHeaders(false) });
       const data = await r.json();
       const raw = data.files?.[FILENAME]?.content || '{"collections":[],"websites":[]}';
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -373,7 +365,7 @@ async function handleStore(req, res) {
       try {
         await fetch(GH_URL, {
           method: 'PATCH',
-          headers: gistHeaders(),
+          headers: gistHeaders(true),
           body: JSON.stringify({ files: { [FILENAME]: { content: body } } }),
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
