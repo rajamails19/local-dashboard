@@ -280,6 +280,8 @@ function OSApp() {
   const [menuDragIdx,  setMenuDragIdx]  = oS(null);
   const [menuDragOver, setMenuDragOver] = oS(null);
   const [syncStatus,   setSyncStatus]   = oS("idle"); // "idle" | "saving" | "ok" | "error"
+  const [leftOpen,     setLeftOpen]     = oS(true);
+  const [rightOpen,    setRightOpen]    = oS(true);
 
   const dragIdx        = oR(null);
   const [dragOver,     setDragOver]     = oS(null);   // index being hovered
@@ -720,30 +722,52 @@ function OSApp() {
             }
           };
           const handleDelete = (item) => {
-            if(item._type==="server") return; // servers can't be deleted from sidebar
+            if(item._type==="server") return;
             if(isCollection) deleteCollectionItem(activeCollection.id, item._w);
             else deleteWebsite(item._w);
           };
 
-          const sidebarStyle = {
-            width:148, flexShrink:0, alignSelf:"stretch",
-            background:"rgba(0,0,0,.18)", borderRadius:14,
-            overflow:"hidden", display:"flex", flexDirection:"column",
+          const sidebarBase = {
+            flexShrink:0, alignSelf:"stretch", background:"rgba(0,0,0,.18)",
+            borderRadius:14, overflow:"hidden", display:"flex", flexDirection:"column",
+            transition:"width .2s ease",
           };
           const sidebarHead = {
             fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
-            color:"rgba(255,255,255,.3)", padding:"8px 10px 4px", borderBottom:"1px solid rgba(255,255,255,.07)"
+            color:"rgba(255,255,255,.3)", padding:"8px 8px 4px",
+            borderBottom:"1px solid rgba(255,255,255,.07)",
+            display:"flex", alignItems:"center", justifyContent:"space-between", gap:4,
           };
+          const toggleBtn = (open, onClick, side) => (
+            <span onClick={onClick} title={open?"Collapse":"Expand"}
+              style={{ cursor:"pointer", fontSize:11, color:"rgba(255,255,255,.4)", lineHeight:1,
+                background:"rgba(255,255,255,.08)", borderRadius:4, padding:"2px 5px",
+                userSelect:"none", flexShrink:0 }}>
+              {side==="left" ? (open?"◀":"▶") : (open?"▶":"◀")}
+            </span>
+          );
+          const addBtn = (
+            <span onClick={openAdd} title="Add new"
+              style={{ cursor:"pointer", fontSize:13, fontWeight:700, color:"rgba(255,255,255,.5)",
+                lineHeight:1, background:"rgba(255,255,255,.08)", borderRadius:4, padding:"1px 5px",
+                userSelect:"none", flexShrink:0 }}>+</span>
+          );
 
           return (
             <React.Fragment>
               {/* LEFT sidebar */}
-              <div style={{...sidebarStyle, marginRight:8}}>
-                <div style={sidebarHead}>Quick Links</div>
-                <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
-                  <QuickList items={leftItems} startNum={1}
-                    onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+              <div style={{...sidebarBase, width:leftOpen?148:28, marginRight:8}}>
+                <div style={sidebarHead}>
+                  {leftOpen && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
+                  {leftOpen && addBtn}
+                  {toggleBtn(leftOpen, ()=>setLeftOpen(o=>!o), "left")}
                 </div>
+                {leftOpen && (
+                  <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
+                    <QuickList items={leftItems} startNum={1}
+                      onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+                  </div>
+                )}
               </div>
 
               {/* CENTER panel */}
@@ -818,12 +842,18 @@ function OSApp() {
               </div>{/* end cc-panel */}
 
               {/* RIGHT sidebar */}
-              <div style={{...sidebarStyle, marginLeft:8}}>
-                <div style={sidebarHead}>Quick Links</div>
-                <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
-                  <QuickList items={rightItems} startNum={half+1}
-                    onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+              <div style={{...sidebarBase, width:rightOpen?148:28, marginLeft:8}}>
+                <div style={sidebarHead}>
+                  {toggleBtn(rightOpen, ()=>setRightOpen(o=>!o), "right")}
+                  {rightOpen && addBtn}
+                  {rightOpen && <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>Quick Links</span>}
                 </div>
+                {rightOpen && (
+                  <div style={{ overflowY:"auto", flex:1, padding:"4px 6px" }}>
+                    <QuickList items={rightItems} startNum={half+1}
+                      onEditName={handleEditName} onEditUrl={handleEditUrl} onDelete={handleDelete}/>
+                  </div>
+                )}
               </div>
             </React.Fragment>
           );
