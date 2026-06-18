@@ -137,6 +137,26 @@ function NewCollectionInput({ onConfirm, onCancel }) {
   );
 }
 
+/* ── simple click-to-edit inline text ── */
+function InlineRename({ value, onSave }) {
+  const [editing, setEditing] = oS(false);
+  const [val,     setVal]     = oS(value);
+  oE(()=>setVal(value),[value]);
+  const commit = () => { if(val.trim()) onSave(val.trim()); setEditing(false); };
+  if (editing) return (
+    <input autoFocus value={val} onChange={e=>setVal(e.target.value)}
+      onBlur={commit} onKeyDown={e=>{ if(e.key==="Enter") commit(); if(e.key==="Escape") setEditing(false); }}
+      style={{ background:"transparent", border:"none", borderBottom:"1.5px solid var(--amber)", outline:"none",
+        color:"inherit", fontSize:"inherit", fontWeight:"inherit", fontFamily:"inherit", width: Math.max(80, val.length*10) }} />
+  );
+  return (
+    <span onClick={()=>setEditing(true)} title="Click to rename"
+      style={{ cursor:"text", borderBottom:"1px dashed rgba(255,255,255,.2)", paddingBottom:1 }}>
+      {value}
+    </span>
+  );
+}
+
 function OSApp() {
   /* ── state ── */
   const [projects,     setProjects]     = oS([]);
@@ -166,7 +186,11 @@ function OSApp() {
   const [collections,  setCollections]  = oS(()=>{
     try { return JSON.parse(localStorage.getItem("lv_collections")||"[]"); } catch{ return []; }
   });
-  const [addingTab,    setAddingTab]    = oS(false);   // show inline name input
+  const [addingTab,    setAddingTab]    = oS(false);
+  /* custom labels for built-in tabs — persisted */
+  const [tabLabels,    setTabLabels]    = oS(()=>{
+    try { return JSON.parse(localStorage.getItem("lv_tab_labels")||"{}"); } catch{ return {}; }
+  });
 
   const dragIdx        = oR(null);
   const [dragOver,     setDragOver]     = oS(null);   // index being hovered
@@ -195,7 +219,17 @@ function OSApp() {
     });
   }, []);
 
+  const tabLabelsRef = oR(tabLabels);
+  tabLabelsRef.current = tabLabels;
+
   /* sync-save helpers — called immediately inside every mutation */
+  const saveTabLabels = tl => {
+    try { localStorage.setItem("lv_tab_labels", JSON.stringify(tl)); } catch{}
+    return tl;
+  };
+  const renameBuiltinTab = (key, label) => {
+    setTabLabels(tl=>{ const next={...tl,[key]:label}; saveTabLabels(next); return next; });
+  };
   const saveCollections = cs => {
     try { localStorage.setItem("lv_collections", JSON.stringify(cs)); } catch{}
     if (REMOTE) remoteSave({ collections: cs, websites: websitesRef.current });
@@ -296,6 +330,11 @@ function OSApp() {
     dragIdx.current = null;
   }, [tab]);
 
+  const deleteWebsite = oCB(w => {
+    setWebsites(ws=>{ const next=ws.filter(x=>x.id!==w.id); saveWebsites(next); return next; });
+    setActiveWeb(null);
+  },[]);
+
   const deleteCollectionItem = oCB((colId, w) => {
     setCollections(cs=>{ const next=cs.map(c=>c.id===colId?{...c,items:c.items.filter(x=>x.id!==w.id)}:c); saveCollections(next); return next; });
     setActiveWeb(null);
@@ -394,11 +433,21 @@ function OSApp() {
           <div className="mb-logo"><span className="dot">{DI.bolt}</span></div>
           <span className="mb-item bold">localhost</span>
           <span className="mb-item">View</span>
-          <span className="mb-item" style={{ cursor:"pointer", color: isServers ? "#fff" : "rgba(255,255,255,.7)" }}
-            onClick={()=>{ setTab("servers"); localStorage.setItem("lv_tab","servers"); setQuery(""); }}>Servers</span>
+          <CollectionTab
+            c={{ id:"servers", label: tabLabels["servers"] || "Servers" }}
+            active={isServers}
+            onSelect={()=>{ setTab("servers"); localStorage.setItem("lv_tab","servers"); setQuery(""); }}
+            onRename={name=>renameBuiltinTab("servers",name)}
+            onDelete={null}
+          />
           <span className="mb-item">Window</span>
-          <span className="mb-item" style={{ cursor:"pointer", color: isWebsites ? "var(--amber)" : "rgba(255,255,255,.7)" }}
-            onClick={()=>{ setTab("websites"); localStorage.setItem("lv_tab","websites"); setQuery(""); }}>Websites</span>
+          <CollectionTab
+            c={{ id:"websites", label: tabLabels["websites"] || "Websites" }}
+            active={isWebsites}
+            onSelect={()=>{ setTab("websites"); localStorage.setItem("lv_tab","websites"); setQuery(""); }}
+            onRename={name=>renameBuiltinTab("websites",name)}
+            onDelete={null}
+          />
 
           {/* ── custom collection tabs ── */}
           {collections.map(c=>(
@@ -439,7 +488,10 @@ function OSApp() {
           <div className="cc-head">
             {isServers ? (
               <React.Fragment>
-                <div className="t">Running Servers <span>{filteredServers.length}</span></div>
+                <div className="t">
+                  <InlineRename value={tabLabels["servers_panel"] || "Running Servers"} onSave={v=>renameBuiltinTab("servers_panel",v)}/>
+                  <span>{filteredServers.length}</span>
+                </div>
                 <div className="cc-spacer"/>
                 <button onClick={openAdd} style={{ padding:"6px 14px", borderRadius:8, border:"1px solid rgba(255,255,255,.18)", background:"rgba(255,255,255,.08)", color:"rgba(255,255,255,.8)", fontSize:13, fontWeight:700, cursor:"pointer", marginRight:8 }}>+ Add</button>
                 <div className="seg">
@@ -451,7 +503,12 @@ function OSApp() {
             ) : (
               <React.Fragment>
                 <div className="t">
-                  {isCollection ? activeCollection.label : "Deployed Websites"}
+                  <InlineRename
+                    value={isCollection ? activeCollection.label : (tabLabels["websites_panel"] || "Deployed Websites")}
+                    onSave={v => isCollection
+                      ? setCollections(cs=>{ const next=cs.map(c=>c.id===activeCollection.id?{...c,label:v}:c); saveCollections(next); return next; })
+                      : renameBuiltinTab("websites_panel", v)}
+                  />
                   <span style={{marginLeft:6}}>{gridItems.length}</span>
                 </div>
                 <div className="cc-spacer"/>
@@ -512,7 +569,9 @@ function OSApp() {
           if(isCollection) updateCollectionWebsite(activeCollection.id, w, patch);
           else updateWebsite(w, patch);
         }}
-        onDelete={isCollection ? (w=>deleteCollectionItem(activeCollection.id, w)) : null}
+        onDelete={isCollection
+          ? (w=>deleteCollectionItem(activeCollection.id, w))
+          : deleteWebsite}
       />
       <AddModal open={showAdd} defaultType={addType} onClose={()=>setShowAdd(false)} onAddServer={addServer} onAddWebsite={addWebsite}/>
       <Notification notif={notif} onGo={()=>{ const np=projects.find(x=>x.id===notif.id); if(np)openP(np); setNotif(null); }}/>
