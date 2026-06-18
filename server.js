@@ -325,6 +325,69 @@ function handleBody(req, cb) {
   });
 }
 
+// ── Gist store (shared with Vercel /api/store) ──────────────────────────────
+const GIST_ID  = process.env.GIST_ID  || '660b74fa63764a84664eb6703e92d1ed';
+const GH_TOKEN = process.env.GH_TOKEN || '';
+const GH_URL   = `https://api.github.com/gists/${GIST_ID}`;
+const FILENAME = 'lv_store.json';
+
+function gistHeaders() {
+  return {
+    'Authorization': `token ${GH_TOKEN}`,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'User-Agent': 'local-dashboard',
+  };
+}
+
+async function handleStore(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  if (!GH_TOKEN) {
+    console.warn('[store] GH_TOKEN not set — set it via: export GH_TOKEN=your_token');
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'GH_TOKEN not configured' }));
+    return;
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const r = await fetch(GH_URL, { headers: gistHeaders() });
+      const data = await r.json();
+      const raw = data.files?.[FILENAME]?.content || '{"collections":[],"websites":[]}';
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(raw);
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ error: String(e) }));
+    }
+    return;
+  }
+
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        await fetch(GH_URL, {
+          method: 'PATCH',
+          headers: gistHeaders(),
+          body: JSON.stringify({ files: { [FILENAME]: { content: body } } }),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(500); res.end(JSON.stringify({ error: String(e) }));
+      }
+    });
+    return;
+  }
+
+  res.writeHead(405); res.end();
+}
+
 // ── HTTP server ──────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -332,6 +395,9 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  // ── Gist store sync ──
+  if (req.url === '/api/store') { handleStore(req, res); return; }
 
   // ── SSE stream ──
   if (req.url === '/api/stream' && req.method === 'GET') {

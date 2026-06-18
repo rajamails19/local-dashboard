@@ -6,8 +6,8 @@ const { useState: oS, useEffect: oE, useMemo: oM, useRef: oR, useCallback: oCB }
 /* ── cross-file component refs ── */
 const AddModal = window.AddModal;
 
-/* ── Remote store (Gist via /api/store) — falls back to localStorage only ── */
-const REMOTE = typeof window !== "undefined" && window.location.hostname !== "localhost";
+/* ── Remote store (Gist via /api/store) — always on; both localhost + Vercel sync ── */
+const REMOTE = true;
 async function remoteLoad() {
   try {
     const r = await fetch("/api/store");
