@@ -490,6 +490,11 @@ function OSApp() {
     setActive(a=>a&&a.id===p.id?{...a,displayName:v}:a);
   },[]);
 
+  const updateServerIcon = oCB((p, b64) => {
+    setProjects(ps=>ps.map(x=>x.id===p.id?{...x,customImage:b64}:x));
+    setActive(a=>a&&a.id===p.id?{...a,customImage:b64}:a);
+  },[]);
+
   const updateWebsite = oCB((w, patch) => {
     setWebsites(ws=>{ const next=ws.map(x=>x.id===w.id?{...x,...patch}:x); saveWebsites(next); return next; });
     setActiveWeb(a=>a&&a.id===w.id?{...a,...patch}:a);
@@ -882,7 +887,7 @@ function OSApp() {
       )}
 
       {/* ── detail windows ── */}
-      <MacWindow p={winP} onClose={closeP} onToggle={(p,on)=>{ if(!on){ kill(p); closeP(); } }}/>
+      <MacWindow p={winP} onClose={closeP} onToggle={(p,on)=>{ if(!on){ kill(p); closeP(); } }} onRename={rename} onUpdateIcon={updateServerIcon}/>
       <WebWindow w={winW} onClose={closeW}
         onUpdate={(w,patch)=>{
           if(isCollection) updateCollectionWebsite(activeCollection.id, w, patch);

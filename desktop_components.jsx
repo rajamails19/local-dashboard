@@ -121,13 +121,23 @@ function Dock({ projects, onOpen, onToggle, mouseX, setMouseX, bounceId, sysButt
 }
 
 /* ---------------- Mac window (detail) ---------------- */
-function MacWindow({ p, onClose, onToggle }) {
-  const [copied, setCopied] = dS(false);
+function MacWindow({ p, onClose, onToggle, onRename, onUpdateIcon }) {
+  const [copied,      setCopied]      = dS(false);
+  const [editingName, setEditingName] = dS(false);
+  const [nameVal,     setNameVal]     = dS("");
+  const imgRef = dR(null);
+  dE(() => { setNameVal(p ? (p.displayName || p.name) : ""); setEditingName(false); }, [p]);
   dE(() => { const k = (e) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
   const fw = p ? (window.FW[p.framework] || { glyph: "node", color: "#6d7bff" }) : {};
   const run = p && dIsRun(p);
   const dbInfo = p && p.database ? window.DBINFO[p.database] : null;
   const copy = () => { try { navigator.clipboard.writeText(p.path); } catch (e) {} setCopied(true); setTimeout(() => setCopied(false), 1400); };
+  const commitName = () => { setEditingName(false); if (nameVal.trim() && onRename) onRename(p, nameVal.trim()); };
+  const pickIcon = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const b64 = await compressImage(file, 120);
+    if (onUpdateIcon) onUpdateIcon(p, b64);
+  };
   return (
     <React.Fragment>
       <div className={`win-scrim ${p ? "open" : ""}`} onClick={onClose} />
@@ -140,12 +150,33 @@ function MacWindow({ p, onClose, onToggle }) {
                 <span className="light y" onClick={onClose}>{DI.minus}</span>
                 <span className="light g">{DI.plus}</span>
               </div>
-              <div className="win-title">{p.name} — localhost:{p.frontend.port}</div>
+              <div className="win-title">{p.displayName||p.name} — localhost:{p.frontend.port}</div>
             </div>
             <div className="win-body">
               <div className="win-hero">
-                <div className="app-icon" style={{ background: iconBg(fw.color) }}>{dGlyph(fw.glyph)}</div>
-                <div className="win-hid"><h2>{p.name}</h2><div className="sub">{p.framework}</div></div>
+                {/* clickable icon → upload custom image */}
+                <div style={{ position:"relative", cursor:"pointer" }} onClick={()=>imgRef.current&&imgRef.current.click()} title="Click to change icon">
+                  {p.customImage
+                    ? <img src={p.customImage} alt="" style={{ width:56, height:56, borderRadius:14, objectFit:"cover" }}/>
+                    : <div className="app-icon" style={{ background: iconBg(fw.color) }}>{dGlyph(fw.glyph)}</div>
+                  }
+                  <span style={{ position:"absolute", bottom:0, right:0, background:"rgba(0,0,0,.6)", borderRadius:6, fontSize:9, padding:"1px 3px", color:"#fff", lineHeight:1.4 }}>✎</span>
+                  <input ref={imgRef} type="file" accept="image/*" style={{ display:"none" }} onChange={pickIcon}/>
+                </div>
+                {/* clickable name → inline edit */}
+                <div className="win-hid">
+                  {editingName
+                    ? <input autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)}
+                        onBlur={commitName} onKeyDown={e=>{ if(e.key==="Enter") commitName(); if(e.key==="Escape") setEditingName(false); }}
+                        style={{ background:"transparent", border:"none", borderBottom:"1.5px solid var(--amber)", outline:"none",
+                          color:"inherit", fontSize:"1.2rem", fontWeight:700, fontFamily:"inherit", width:"100%" }}/>
+                    : <h2 onClick={()=>setEditingName(true)} title="Click to rename"
+                        style={{ cursor:"text", borderBottom:"1px dashed rgba(255,255,255,.2)" }}>
+                        {p.displayName||p.name}
+                      </h2>
+                  }
+                  <div className="sub">{p.framework}</div>
+                </div>
               </div>
               <div className="win-tags">
                 <span className={`wtag ${run ? "live" : ""}`}><span style={{ width: 7, height: 7, borderRadius: "50%", background: run ? "var(--green)" : "var(--txt-faint)", boxShadow: run ? "0 0 6px var(--green)" : "none" }} />{run ? "Running" : "Stopped"}</span>
