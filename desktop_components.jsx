@@ -126,7 +126,7 @@ function MacWindow({ p, onClose, onToggle, onRename, onUpdateIcon }) {
   const [editingName, setEditingName] = dS(false);
   const [nameVal,     setNameVal]     = dS("");
   const imgRef = dR(null);
-  dE(() => { setNameVal(p ? (p.displayName || p.name) : ""); setEditingName(false); }, [p]);
+  dE(() => { setNameVal(p ? (p.displayName || p.name) : ""); setEditingName(false); }, [p?.id]);
   dE(() => { const k = (e) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
   const fw = p ? (window.FW[p.framework] || { glyph: "node", color: "#6d7bff" }) : {};
   const run = p && dIsRun(p);
