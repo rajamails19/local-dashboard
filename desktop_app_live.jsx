@@ -707,7 +707,7 @@ function OSApp() {
       </div>
 
       {/* ── stage ── */}
-      <div className="stage" style={{ flexDirection:"row", alignItems:"flex-start", padding:"26px 12px 8px" }}>
+      <div className="stage" style={{ flexDirection:"row", alignItems:"stretch", padding:"26px 12px 8px" }}>
         {/* sidebar data */}
         {(()=>{
           const quickItems = isServers
