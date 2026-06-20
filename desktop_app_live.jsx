@@ -53,8 +53,10 @@ function xform(raw, names) {
   const feat= raw.readme
     ? [...raw.readme.matchAll(/^[-*•]\s+(.+)/gm)].map(m=>m[1].replace(/[*_`]/g,"").trim()).filter(Boolean).slice(0,5)
     : [];
+  const port0 = pts[0] || null;
   return {
-    id:raw.dir, name, displayName:names[raw.dir]||null, path:raw.dir,
+    id: port0 ? `${raw.dir}:${port0}` : raw.dir,   // unique per port
+    name, displayName:names[raw.dir]||null, path:raw.dir,
     framework:fw, folder:fold, branch:raw.branch||null, dirty:raw.dirty||false,
     commit:null,
     uptime:Math.floor((Date.now()-_st[raw.dir])/1000),
@@ -480,13 +482,14 @@ function OSApp() {
   },[]);
 
   const kill = oCB(p=>{
-    fetch("/api/kill",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir:p.id,port:p.frontend.port})}).catch(()=>{});
+    fetch("/api/kill",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir:p.path||p.id,port:p.frontend.port})}).catch(()=>{});
     setProjects(ps=>ps.map(x=>x.id===p.id?{...x,frontend:{...x.frontend,up:false},backend:x.backend?{...x.backend,up:false}:x.backend}:x));
   },[]);
 
   const rename = oCB((p,v)=>{
-    setNames(prev=>({...prev,[p.id]:v}));
-    fetch("/api/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir:p.id,name:v})}).catch(()=>{});
+    const dir = p.path||p.id;
+    setNames(prev=>({...prev,[dir]:v}));
+    fetch("/api/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir,name:v})}).catch(()=>{});
     setProjects(ps=>ps.map(x=>x.id===p.id?{...x,displayName:v}:x));
     setActive(a=>a&&a.id===p.id?{...a,displayName:v}:a);
   },[]);
