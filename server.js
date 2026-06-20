@@ -275,22 +275,38 @@ function scanProjects(cb) {
     }
 
     getPortsForPids(expandedPids, (pidPortMap) => {
+      // Build one entry per (dir, port) — separate card per running port
+      const byDirPort = {};
       for (const proj of Object.values(projects)) {
-        const portSet = new Set();
-        const allPids = new Set();
         for (const pid of proj.pids) {
-          for (const p of descendantPids(pid, childMap)) {
-            allPids.add(p);
-            for (const port of (pidPortMap[p] || [])) portSet.add(port);
+          const desc = [...descendantPids(pid, childMap)];
+          const ports = [];
+          for (const p of desc) {
+            for (const port of (pidPortMap[p] || [])) ports.push(port);
+          }
+          if (ports.length === 0) {
+            // No port found yet — emit one card without a port
+            const key = `${proj.dir}:none`;
+            if (!byDirPort[key]) {
+              byDirPort[key] = { ...proj, ports: [], pids: [pid] };
+            }
+          } else {
+            for (const port of ports) {
+              const key = `${proj.dir}:${port}`;
+              if (!byDirPort[key]) {
+                byDirPort[key] = { ...proj, ports: [port], pids: [pid] };
+              }
+            }
           }
         }
-        proj.ports = [...portSet].sort((a, b) => a - b);
-        // Save pids for killing (root pids only)
-        projectPids[proj.dir] = [...proj.pids];
-        delete proj.pids;
       }
 
-      const result = Object.values(projects).sort((a, b) => a.name.localeCompare(b.name));
+      const result = Object.values(byDirPort).map(proj => {
+        projectPids[`${proj.dir}:${proj.ports[0]||'none'}`] = proj.pids;
+        delete proj.pids;
+        return proj;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
       cb(result);
     });
   });
@@ -446,8 +462,10 @@ const server = http.createServer((req, res) => {
 
   // ── Kill a project ──
   if (req.url === '/api/kill' && req.method === 'POST') {
-    handleBody(req, ({ dir }) => {
-      const pids = projectPids[dir];
+    handleBody(req, ({ dir, port }) => {
+      // Try new per-port key first, fall back to any matching dir
+      const key = port ? `${dir}:${port}` : Object.keys(projectPids).find(k => k.startsWith(dir + ':'));
+      const pids = projectPids[key];
       if (!pids || pids.length === 0) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'No pids found for dir' }));
@@ -459,7 +477,7 @@ const server = http.createServer((req, res) => {
           catch { execSync(`kill -TERM ${pid} 2>/dev/null`); }
         } catch {}
       }
-      delete projectPids[dir];
+      delete projectPids[key];
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, killed: pids }));
     });

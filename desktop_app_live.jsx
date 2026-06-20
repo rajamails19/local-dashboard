@@ -480,7 +480,7 @@ function OSApp() {
   },[]);
 
   const kill = oCB(p=>{
-    fetch("/api/kill",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir:p.id})}).catch(()=>{});
+    fetch("/api/kill",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dir:p.id,port:p.frontend.port})}).catch(()=>{});
     setProjects(ps=>ps.map(x=>x.id===p.id?{...x,frontend:{...x.frontend,up:false},backend:x.backend?{...x.backend,up:false}:x.backend}:x));
   },[]);
 
