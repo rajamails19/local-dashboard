@@ -19,20 +19,28 @@ function saveName(dir, name) {
 }
 
 const DEV_PATTERNS = [
+  // Next.js
   { re: /node.*\.bin\/next(\s+dev)?/, framework: 'Next.js', color: '#ffffff', bg: '#000000', icon: '▲' },
   { re: /next-server/, framework: 'Next.js', color: '#ffffff', bg: '#000000', icon: '▲' },
+  { re: /npx\s+next(\s+dev)?/, framework: 'Next.js', color: '#ffffff', bg: '#000000', icon: '▲' },
+  // Vite — matches .bin/vite, npx vite, bun x vite, bun run dev→vite
   { re: /\.bin\/vite(\s|$)/, framework: 'Vite', color: '#bd34fe', bg: '#1a1a2e', icon: '⚡' },
-  { re: /\.bin\/nuxt/, framework: 'Nuxt', color: '#00c58e', bg: '#002e1a', icon: '▲' },
-  { re: /\.bin\/remix/, framework: 'Remix', color: '#e8f2ff', bg: '#1a1a2e', icon: '💿' },
-  { re: /\.bin\/astro/, framework: 'Astro', color: '#ff5d01', bg: '#1a0a00', icon: '🚀' },
-  { re: /\.bin\/svelte/, framework: 'SvelteKit', color: '#ff3e00', bg: '#1a0a00', icon: '🔥' },
+  { re: /npx\s+vite(\s|$)/, framework: 'Vite', color: '#bd34fe', bg: '#1a1a2e', icon: '⚡' },
+  { re: /bun\s+(x\s+)?vite(\s|$)/, framework: 'Vite', color: '#bd34fe', bg: '#1a1a2e', icon: '⚡' },
+  // Nuxt / Remix / Astro / Svelte
+  { re: /\.bin\/nuxt|npx\s+nuxt/, framework: 'Nuxt', color: '#00c58e', bg: '#002e1a', icon: '▲' },
+  { re: /\.bin\/remix|npx\s+remix/, framework: 'Remix', color: '#e8f2ff', bg: '#1a1a2e', icon: '💿' },
+  { re: /\.bin\/astro|npx\s+astro/, framework: 'Astro', color: '#ff5d01', bg: '#1a0a00', icon: '🚀' },
+  { re: /\.bin\/svelte|npx\s+svelte/, framework: 'SvelteKit', color: '#ff3e00', bg: '#1a0a00', icon: '🔥' },
+  // Python
   { re: /uvicorn|fastapi/, framework: 'FastAPI', color: '#06b6d4', bg: '#0a2e1a', icon: '🚀' },
   { re: /manage\.py\s+runserver/, framework: 'Django', color: '#44b78b', bg: '#0a2014', icon: '🎸' },
   { re: /flask/, framework: 'Flask', color: '#94a3b8', bg: '#1a1a2e', icon: '🌶' },
+  // Other
   { re: /rails\s+server|puma/, framework: 'Rails', color: '#cc0000', bg: '#2e0a0a', icon: '💎' },
   { re: /\.bin\/nodemon/, framework: 'Node (nodemon)', color: '#68a063', bg: '#14290a', icon: '⬡' },
   { re: /node\s+server/, framework: 'Node.js', color: '#68a063', bg: '#14290a', icon: '⬡' },
-  { re: /\.bin\/expo/, framework: 'Expo', color: '#ffffff', bg: '#1a1a2e', icon: '📱' },
+  { re: /\.bin\/expo|npx\s+expo/, framework: 'Expo', color: '#ffffff', bg: '#1a1a2e', icon: '📱' },
   { re: /concurrently/, framework: 'Concurrent', color: '#94a3b8', bg: '#1a1a2e', icon: '⚙️' },
 ];
 
@@ -197,7 +205,8 @@ function descendantPids(pid, childMap, out = new Set()) {
 const projectPids = {};
 
 function scanProjects(cb) {
-  exec('ps aux', (err, stdout) => {
+  // ps axww = all processes, full (unwrapped) command lines — avoids truncation
+  exec('ps axww -o pid=,command=', (err, stdout) => {
     if (err) return cb([]);
 
     const lines = stdout.split('\n');
@@ -205,10 +214,12 @@ function scanProjects(cb) {
     const childMap = buildChildMap();
 
     for (const line of lines) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length < 11) continue;
-      const pid = parts[1];
-      const cmd = parts.slice(10).join(' ');
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const spaceIdx = trimmed.indexOf(' ');
+      if (spaceIdx === -1) continue;
+      const pid = trimmed.slice(0, spaceIdx).trim();
+      const cmd = trimmed.slice(spaceIdx + 1).trim();
 
       const framework = detectFramework(cmd);
       if (!framework) continue;
