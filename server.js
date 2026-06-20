@@ -275,39 +275,37 @@ function scanProjects(cb) {
     }
 
     getPortsForPids(expandedPids, (pidPortMap) => {
-      // Build one entry per (dir, port) — separate card per running port
-      const byDirPort = {};
+      const finalProjects = [];
+
       for (const proj of Object.values(projects)) {
+        // Gather ALL ports from ALL pids + their descendants (deduped)
+        const portSet = new Set();
         for (const pid of proj.pids) {
-          const desc = [...descendantPids(pid, childMap)];
-          const ports = [];
-          for (const p of desc) {
-            for (const port of (pidPortMap[p] || [])) ports.push(port);
+          for (const p of descendantPids(pid, childMap)) {
+            for (const port of (pidPortMap[p] || [])) portSet.add(port);
           }
-          if (ports.length === 0) {
-            // No port found yet — emit one card without a port
-            const key = `${proj.dir}:none`;
-            if (!byDirPort[key]) {
-              byDirPort[key] = { ...proj, ports: [], pids: [pid] };
-            }
-          } else {
-            for (const port of ports) {
-              const key = `${proj.dir}:${port}`;
-              if (!byDirPort[key]) {
-                byDirPort[key] = { ...proj, ports: [port], pids: [pid] };
-              }
-            }
+        }
+
+        const allPorts = [...portSet].sort((a, b) => a - b);
+
+        if (allPorts.length === 0) {
+          // No port detected yet — one placeholder card
+          projectPids[proj.dir] = [...proj.pids];
+          const entry = { ...proj }; delete entry.pids;
+          finalProjects.push(entry);
+        } else {
+          // One card per unique port
+          for (const port of allPorts) {
+            const key = `${proj.dir}:${port}`;
+            projectPids[key] = [...proj.pids];
+            const entry = { ...proj, ports: [port] }; delete entry.pids;
+            finalProjects.push(entry);
           }
         }
       }
 
-      const result = Object.values(byDirPort).map(proj => {
-        projectPids[`${proj.dir}:${proj.ports[0]||'none'}`] = proj.pids;
-        delete proj.pids;
-        return proj;
-      }).sort((a, b) => a.name.localeCompare(b.name));
-
-      cb(result);
+      finalProjects.sort((a, b) => a.name.localeCompare(b.name));
+      cb(finalProjects);
     });
   });
 }
