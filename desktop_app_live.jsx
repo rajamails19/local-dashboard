@@ -59,6 +59,7 @@ function xform(raw, names) {
     commit:null,
     uptime:Math.floor((Date.now()-_st[raw.dir])/1000),
     frontend:{ port:pts[0]||null, up:pts.length>0 },
+    allPorts: pts,
     backend: bk ? { type:bk.label, port:pts.length>1?pts[1]:null, up:pts.length>0 } : null,
     database:dbN, about:abt, features:feat,
   };

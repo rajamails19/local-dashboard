@@ -180,7 +180,12 @@ function MacWindow({ p, onClose, onToggle, onRename, onUpdateIcon }) {
               </div>
               <div className="win-tags">
                 <span className={`wtag ${run ? "live" : ""}`}><span style={{ width: 7, height: 7, borderRadius: "50%", background: run ? "var(--green)" : "var(--txt-faint)", boxShadow: run ? "0 0 6px var(--green)" : "none" }} />{run ? "Running" : "Stopped"}</span>
-                <span className="wtag port">{DI.bolt}:{p.frontend.port}</span>
+                {/* show ALL ports, not just the primary */}
+                {(p.allPorts && p.allPorts.length > 0 ? p.allPorts : [p.frontend.port]).filter(Boolean).map(port => (
+                  <span key={port} className="wtag port" style={{ cursor:"pointer" }}
+                    onClick={()=>window.open(`http://localhost:${port}`,"_blank")}
+                    title={`Open :${port}`}>{DI.bolt}:{port}</span>
+                ))}
                 <span className="wtag">{DI.folder}{p.folder}</span>
                 {run && <span className="wtag">{DI.clock}{dFmtUp(p.uptime)}</span>}
               </div>
@@ -204,7 +209,12 @@ function MacWindow({ p, onClose, onToggle, onRename, onUpdateIcon }) {
             </div>
             <div className="win-foot">
               {run
-                ? <button className="wbtn primary" onClick={() => window.open(`http://localhost:${p.frontend.port}`, "_blank")}>{DI.ext}Open :{p.frontend.port}</button>
+                ? (p.allPorts && p.allPorts.length > 1
+                    ? p.allPorts.map(port => (
+                        <button key={port} className="wbtn primary" onClick={() => window.open(`http://localhost:${port}`, "_blank")}>{DI.ext}Open :{port}</button>
+                      ))
+                    : <button className="wbtn primary" onClick={() => window.open(`http://localhost:${p.frontend.port}`, "_blank")}>{DI.ext}Open :{p.frontend.port}</button>
+                  )
                 : <button className="wbtn primary" onClick={() => onToggle(p, true)}>{DI.play}Start</button>}
               <button className="wbtn">{DI.code}VS Code</button>
               {run && <button className="wbtn danger" onClick={() => onToggle(p, false)}>{DI.stop}Stop</button>}
