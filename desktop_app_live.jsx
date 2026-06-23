@@ -326,7 +326,9 @@ function OSApp() {
     menuHidden:  menuHiddenRef.current,
   });
 
-  /* apply remote data to state + localStorage */
+  /* apply remote data to state + localStorage
+     On localhost (REMOTE_WRITE=false): only sync cards/collections, NOT layout prefs
+     On Vercel  (REMOTE_WRITE=true):   sync everything                                */
   const applyRemoteData = oCB(data => {
     if (!data) return;
     if (Array.isArray(data.collections)) {
@@ -337,17 +339,21 @@ function OSApp() {
       setWebsites(data.websites);
       try { localStorage.setItem("lv_websites", JSON.stringify(data.websites)); } catch{}
     }
-    if (data.tabLabels && typeof data.tabLabels === "object") {
-      setTabLabels(data.tabLabels);
-      try { localStorage.setItem("lv_tab_labels", JSON.stringify(data.tabLabels)); } catch{}
-    }
-    if (Array.isArray(data.menuOrder)) {
-      setMenuOrder(data.menuOrder);
-      try { localStorage.setItem("lv_menu_order", JSON.stringify(data.menuOrder)); } catch{}
-    }
-    if (Array.isArray(data.menuHidden)) {
-      setMenuHidden(data.menuHidden);
-      try { localStorage.setItem("lv_menu_hidden", JSON.stringify(data.menuHidden)); } catch{}
+    // Layout prefs (tab labels, menu order, hidden) only synced on Vercel
+    // On localhost these stay in localStorage so local renames persist across refreshes
+    if (REMOTE_WRITE) {
+      if (data.tabLabels && typeof data.tabLabels === "object") {
+        setTabLabels(data.tabLabels);
+        try { localStorage.setItem("lv_tab_labels", JSON.stringify(data.tabLabels)); } catch{}
+      }
+      if (Array.isArray(data.menuOrder)) {
+        setMenuOrder(data.menuOrder);
+        try { localStorage.setItem("lv_menu_order", JSON.stringify(data.menuOrder)); } catch{}
+      }
+      if (Array.isArray(data.menuHidden)) {
+        setMenuHidden(data.menuHidden);
+        try { localStorage.setItem("lv_menu_hidden", JSON.stringify(data.menuHidden)); } catch{}
+      }
     }
   }, []);
 
